@@ -28,7 +28,7 @@ RUN rm -f workbuddy.deb
 RUN mkdir -p /home/workbuddy/.vnc
 RUN chown -R workbuddy:workbuddy /home/workbuddy/.vnc
 
-# 写入supervisor配置（改用单引号写入，规避shell变量提前解析bug）
+# supervisor配置，EOF加单引号，避免构建时提前解析变量
 RUN mkdir -p /etc/supervisor/conf.d
 RUN cat > /etc/supervisor/conf.d/workbuddy.conf <<'EOF'
 [program:vnc]
@@ -47,7 +47,6 @@ autorestart=true
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
 EOF
 
 EXPOSE 8080
