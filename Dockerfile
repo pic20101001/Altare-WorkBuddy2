@@ -4,7 +4,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV VNC_PW=workbuddy123
 ENV VNC_RESOLUTION=1280x720
 
-# 更新源、安装依赖
 RUN apt update && apt install -y \
     xfce4 xfce4-terminal \
     tigervnc-standalone-server \
@@ -12,31 +11,27 @@ RUN apt update && apt install -y \
     supervisor \
     wget curl gpg \
     fonts-noto-cjk \
-    && apt clean && rm -rf /var/lib/apt/lists/*
+    && apt autoremove -y \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# 创建运行用户
-RUN useradd -m workbuddy && echo "workbuddy:workbuddy" | chpasswd && adduser workbuddy sudo
-USER workbuddy
-WORKDIR /home/workbuddy
+# 创建普通用户
+RUN useradd -m workbuddy && echo "workbuddy:workbuddy" | chpasswd && usermod -aG sudo workbuddy
 
-# 下载安装 WorkBuddy
+# 下载并安装 WorkBuddy
+WORKDIR /tmp
 RUN wget -O workbuddy.deb https://download.workbuddy.ai/linux/WorkBuddy_latest_amd64.deb
-USER root
 RUN dpkg -i workbuddy.deb || apt -f install -y
 RUN rm -f workbuddy.deb
 
-# 配置vnc
-USER workbuddy
+# 准备vnc目录
 RUN mkdir -p /home/workbuddy/.vnc
-RUN echo "$VNC_PW" | vncpasswd -f > /home/workbuddy/.vnc/passwd
-RUN chmod 600 /home/workbuddy/.vnc/passwd
+RUN chown -R workbuddy:workbuddy /home/workbuddy/.vnc
 
-# supervisor配置
-USER root
+# 写入supervisor配置
 RUN mkdir -p /etc/supervisor/conf.d
-COPY <<EOF /etc/supervisor/conf.d/workbuddy.conf
-[program:vnc]
-command=su - workbuddy -c "vncserver :1 -geometry %(ENV_VNC_RESOLUTION)s -depth 24"
+RUN echo '[program:vnc]
+command=su - workbuddy -c "vncserver :1 -geometry %(ENV_VNC_RESOLUTION)s -depth 24 -SecurityTypes VncAuth"
 autostart=true
 autorestart=true
 stdout_logfile=/dev/stdout
@@ -51,8 +46,7 @@ autorestart=true
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-EOF
+stderr_logfile_maxbytes=0' > /etc/supervisor/conf.d/workbuddy.conf
 
 EXPOSE 8080
 
